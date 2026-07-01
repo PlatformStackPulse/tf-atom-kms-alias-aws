@@ -6,9 +6,30 @@
 
 ---
 
-## Purpose
+Terraform atom that creates a human-readable AWS KMS alias (`alias/<label-id>`) for an existing KMS key, with naming driven by the [tf-label](https://github.com/PlatformStackPulse/tf-label) context.
 
-Terraform atom: AWS KMS Alias - creates a human-readable alias for a KMS key
+## Features
+
+- Creates an `aws_kms_alias` pointing at an existing KMS key (`target_key_id`).
+- Alias name is derived from the tf-label `id` (`alias/<namespace>-<stage>-<name>`), keeping naming consistent across the fleet.
+- `enabled = false` cleanly provisions nothing (count-gated), so the atom can be conditionally toggled from a composition.
+- Exposes the alias ARN, alias name, and resolved target key ARN as outputs for downstream wiring.
+- Full tf-label context passthrough (`context`, `namespace`, `tenant`, `environment`, `stage`, `name`, tags, etc.).
+
+## Usage
+
+```hcl
+module "kms_alias" {
+  source = "git::https://github.com/PlatformStackPulse/tf-atom-kms-alias-aws.git?ref=v1.0.0"
+
+  namespace = "eg"
+  stage     = "prod"
+  name      = "app"
+
+  # ID or ARN of an existing KMS key to alias
+  target_key_id = aws_kms_key.app.key_id
+}
+```
 
 ## Module Documentation
 
@@ -70,3 +91,22 @@ Terraform atom: AWS KMS Alias - creates a human-readable alias for a KMS key
 | <a name="output_enabled"></a> [enabled](#output\_enabled) | Whether the module is enabled |
 | <a name="output_target_key_arn"></a> [target\_key\_arn](#output\_target\_key\_arn) | ARN of the target KMS key |
 <!-- END_TF_DOCS -->
+
+## Tests
+
+Unit tests live in [`tests/unit/`](tests/unit/) and use a mocked AWS provider (no
+AWS credentials or real resources required). They assert on plan-known values —
+the tf-label `id`, resource count, and input pass-throughs — and verify the
+`enabled = false` path creates nothing.
+
+```bash
+# Unit tests (mocked provider, no AWS credentials)
+terraform init -backend=false
+terraform test -test-directory=tests/unit
+
+# Or via the Makefile
+make test-unit
+
+# Integration tests (requires AWS credentials)
+terraform test -test-directory=tests/integration
+```
